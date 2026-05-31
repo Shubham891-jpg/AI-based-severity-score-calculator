@@ -19,7 +19,6 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
-MANIFEST
 
 # Virtual environments
 venv/
@@ -31,17 +30,9 @@ venv.bak/
 # Jupyter Notebook
 .ipynb_checkpoints
 
-# PyCharm
+# IDE
 .idea/
-
-# VS Code
 .vscode/
-
-# Data files
-*.csv
-*.json
-*.pkl
-*.joblib
 
 # Logs
 *.log
@@ -51,10 +42,15 @@ logs/
 .DS_Store
 Thumbs.db
 
-# Model artifacts (except sample)
+# Model artifacts — tracked via Git LFS or excluded; keep .gitkeep
 models/*.pkl
 models/*.joblib
+models/*.csv
 !models/.gitkeep
+
+# Data
+data/
+!data/.gitkeep
 
 # Temporary files
 *.tmp
