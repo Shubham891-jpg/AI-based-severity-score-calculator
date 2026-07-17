@@ -2,7 +2,7 @@ import numpy as np
 import joblib
 import os
 import sys
-from typing import Union, List
+from typing import List
 
 # Add src to path for imports
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
@@ -230,8 +230,10 @@ class SeverityPredictor:
                 variance = np.var(tree_predictions)
                 
                 # Convert variance to confidence (0-1 scale)
-                # This is a heuristic - you might want to calibrate this based on your data
-                max_variance = 50  # Reduced from 100 for better sensitivity
+                # Since the target variable is in the range [10, 100], the tree predictions have a
+                # naturally high variance. We calibrate max_variance to 400 (std dev of 20 score points)
+                # so that standard estimator variance doesn't clip confidence to 0%.
+                max_variance = 400
                 confidence = max(0, min(1, 1 - (variance / max_variance)))
                 
                 return float(confidence)

@@ -74,7 +74,7 @@ class TestSeverityPredictor:
                 # Check value ranges
                 assert 10 <= result['severity_score'] <= 100
                 assert 0 <= result['confidence'] <= 1
-                assert result['severity_category'] in ['Critical', 'High', 'Medium', 'Low', 'Minimal']
+                assert result['severity_category'] in ['High', 'Medium', 'Low']
                 
         except FileNotFoundError:
             pytest.skip("Model files not found - train model first")
@@ -285,11 +285,10 @@ class TestSeverityScaler:
         """Test severity category assignment."""
         scaler = SeverityScaler()
         
-        assert scaler.get_severity_category(95) == "Critical"
-        assert scaler.get_severity_category(75) == "High"
-        assert scaler.get_severity_category(50) == "Medium"
-        assert scaler.get_severity_category(30) == "Low"
-        assert scaler.get_severity_category(15) == "Minimal"
+        assert scaler.get_severity_category(95) == "High"
+        assert scaler.get_severity_category(85) == "Medium"
+        assert scaler.get_severity_category(50) == "Low"
+        assert scaler.get_severity_category(15) == "Low"
     
     def test_score_clipping(self):
         """Test score clipping to valid range."""

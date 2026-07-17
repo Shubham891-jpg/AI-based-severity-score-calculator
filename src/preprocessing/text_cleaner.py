@@ -1,6 +1,6 @@
 import re
 import string
-from typing import List, Optional
+from typing import List
 import nltk
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize

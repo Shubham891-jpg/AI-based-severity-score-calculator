@@ -1,5 +1,4 @@
 from langdetect import detect, DetectorFactory
-from typing import Optional
 import re
 from src.utils.logger import get_logger
 

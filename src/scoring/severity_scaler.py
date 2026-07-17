@@ -1,6 +1,6 @@
 import numpy as np
 from sklearn.preprocessing import MinMaxScaler
-from typing import Union, List, Optional
+from typing import Union, List
 import pickle
 import os
 from src.utils.logger import get_logger

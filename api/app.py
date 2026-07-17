@@ -1,15 +1,12 @@
-from fastapi import FastAPI, HTTPException, Query, BackgroundTasks
+from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field, validator
-from typing import Optional, List, Dict, Any
+from typing import List, Dict, Any
 import os
 import sys
 import uvicorn
-from datetime import datetime, timedelta
-import json
-import uuid
-from collections import defaultdict
+from datetime import datetime
 
 # Add src to path for imports
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
@@ -43,10 +40,9 @@ app = FastAPI(
     - **Minimal (10-19)**: Requests, questions
     
     ## Quick Start
-    1. Use `/predict` for single ticket predictions
-    2. Use `/predict/batch` for multiple tickets
-    3. Check `/health` for system status
-    4. View `/stats` for usage analytics
+    - Use `/predict` for single ticket predictions
+    - Use `/predict/batch` for multiple tickets
+    - Check `/health` for system status
     """,
     version="2.0.0",
     docs_url="/docs",
@@ -67,15 +63,6 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 # Global predictor instance
 predictor = None
 
-# In-memory storage for analytics (in production, use a database)
-analytics_data = {
-    "total_predictions": 0,
-    "predictions_by_category": defaultdict(int),
-    "predictions_by_language": defaultdict(int),
-    "recent_predictions": [],
-    "start_time": datetime.now()
-}
-
 # Pydantic models for request/response
 class TicketRequest(BaseModel):
     ticket_text: str = Field(
@@ -91,35 +78,6 @@ class TicketRequest(BaseModel):
         if not v.strip():
             raise ValueError('Ticket text cannot be empty or only whitespace')
         return v.strip()
-
-class TicketRequestWithMetadata(BaseModel):
-    ticket_text: str = Field(
-        ..., 
-        description="IT ticket text in English or Hindi",
-        min_length=1,
-        max_length=5000,
-        example="Server is down and users cannot access email"
-    )
-    ticket_id: Optional[str] = Field(
-        None,
-        description="Optional ticket ID for tracking",
-        example="TICKET-2024-001"
-    )
-    priority: Optional[str] = Field(
-        None,
-        description="Current priority level",
-        example="High"
-    )
-    category: Optional[str] = Field(
-        None,
-        description="Ticket category",
-        example="Infrastructure"
-    )
-    user_id: Optional[str] = Field(
-        None,
-        description="User who submitted the ticket",
-        example="john.doe@company.com"
-    )
 
 class SeverityResponse(BaseModel):
     severity_score: float = Field(
@@ -155,118 +113,6 @@ class SeverityResponse(BaseModel):
         ..., 
         description="Prediction timestamp in ISO format",
         example="2024-01-15T10:30:00.123456"
-    )
-
-class SeverityResponseWithMetadata(SeverityResponse):
-    ticket_id: Optional[str] = Field(
-        None,
-        description="Original ticket ID if provided",
-        example="TICKET-2024-001"
-    )
-    processing_time_ms: float = Field(
-        ...,
-        description="Processing time in milliseconds",
-        example=245.7
-    )
-
-class BatchTicketRequest(BaseModel):
-    tickets: List[str] = Field(
-        ...,
-        description="List of IT ticket texts",
-        max_items=100,
-        example=[
-            "Server is down and users cannot access email",
-            "Printer not working in office",
-            "सर्वर डाउन है"
-        ]
-    )
-    
-    @validator('tickets')
-    def validate_tickets(cls, v):
-        if not v:
-            raise ValueError('Tickets list cannot be empty')
-        if len(v) > 100:
-            raise ValueError('Maximum 100 tickets allowed per batch')
-        return [ticket.strip() for ticket in v if ticket.strip()]
-
-class BatchTicketRequestWithMetadata(BaseModel):
-    tickets: List[TicketRequestWithMetadata] = Field(
-        ...,
-        description="List of tickets with metadata",
-        max_items=100
-    )
-
-class BatchSeverityResponse(BaseModel):
-    predictions: List[SeverityResponse]
-    total_tickets: int = Field(..., description="Total number of tickets processed")
-    processing_time_seconds: float = Field(..., description="Total processing time in seconds")
-    batch_id: str = Field(..., description="Unique batch identifier")
-    success_count: int = Field(..., description="Number of successful predictions")
-    error_count: int = Field(..., description="Number of failed predictions")
-
-class HealthResponse(BaseModel):
-    status: str = Field(..., example="healthy")
-    timestamp: str = Field(..., example="2024-01-15T10:30:00.123456")
-    uptime_seconds: float = Field(..., description="Server uptime in seconds")
-    model_info: Dict[str, Any] = Field(..., description="Model information")
-    system_info: Dict[str, Any] = Field(..., description="System information")
-
-class StatsResponse(BaseModel):
-    total_predictions: int = Field(..., description="Total predictions made")
-    predictions_by_category: Dict[str, int] = Field(..., description="Predictions grouped by severity category")
-    predictions_by_language: Dict[str, int] = Field(..., description="Predictions grouped by detected language")
-    uptime_seconds: float = Field(..., description="Server uptime in seconds")
-    average_processing_time_ms: float = Field(..., description="Average processing time in milliseconds")
-    recent_activity: List[Dict[str, Any]] = Field(..., description="Recent prediction activity")
-
-class ErrorResponse(BaseModel):
-    error: str = Field(..., description="Error type")
-    detail: str = Field(..., description="Error details")
-    timestamp: str = Field(..., description="Error timestamp")
-    request_id: str = Field(..., description="Request identifier for tracking")
-
-class ModelInfoResponse(BaseModel):
-    model_type: str = Field(..., example="RandomForestRegressor")
-    model_parameters: Dict[str, Any] = Field(..., description="Model configuration")
-    feature_info: Dict[str, Any] = Field(..., description="Feature extraction details")
-    training_info: Dict[str, Any] = Field(..., description="Training information")
-    performance_metrics: Dict[str, float] = Field(..., description="Model performance metrics")
-
-class SeverityAnalysisRequest(BaseModel):
-    tickets: List[str] = Field(
-        ...,
-        description="List of tickets to analyze",
-        max_items=50
-    )
-    include_similar: bool = Field(
-        False,
-        description="Include similar tickets analysis"
-    )
-    include_trends: bool = Field(
-        False,
-        description="Include severity trends analysis"
-    )
-    severity_category: str = Field(
-        ..., 
-        description="Severity category (Critical, High, Medium, Low, Minimal)"
-    )
-    confidence: float = Field(
-        ..., 
-        description="Prediction confidence score between 0-1",
-        ge=0,
-        le=1
-    )
-    detected_language: str = Field(
-        ..., 
-        description="Detected language of input text"
-    )
-    processed_text: str = Field(
-        ..., 
-        description="Preprocessed version of input text"
-    )
-    timestamp: str = Field(
-        ..., 
-        description="Prediction timestamp"
     )
 
 class BatchTicketRequest(BaseModel):
@@ -506,7 +352,7 @@ from fastapi.middleware.cors import CORSMiddleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # Configure appropriately for production
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )

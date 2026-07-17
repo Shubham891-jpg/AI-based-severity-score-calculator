@@ -1,5 +1,4 @@
 from googletrans import Translator
-from typing import Optional
 import time
 import random
 from src.utils.logger import get_logger
