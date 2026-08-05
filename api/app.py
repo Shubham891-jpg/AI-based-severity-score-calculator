@@ -1,8 +1,9 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field, validator
-from typing import List, Dict, Any
+from typing import List
 import os
 import sys
 import uvicorn
@@ -347,8 +348,6 @@ async def global_exception_handler(request, exc):
     )
 
 # Add CORS middleware for web applications
-from fastapi.middleware.cors import CORSMiddleware
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # Configure appropriately for production
@@ -356,16 +355,3 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-def main():
-    """Run the FastAPI application."""
-    uvicorn.run(
-        "app:app",
-        host="0.0.0.0",
-        port=8000,
-        reload=False,  # Set to True for development
-        log_level="info"
-    )
-
-if __name__ == "__main__":
-    main()

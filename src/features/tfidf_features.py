@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
-from typing import List, Optional, Union
+from typing import List, Union
 import pickle
 import os
 from src.utils.logger import get_logger

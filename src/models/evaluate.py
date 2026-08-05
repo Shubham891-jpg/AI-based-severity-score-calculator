@@ -5,7 +5,7 @@ import seaborn as sns
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 import os
 import sys
-from typing import List, Dict, Tuple
+from typing import List, Dict
 
 # Add src to path for imports
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))

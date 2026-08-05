@@ -53,6 +53,9 @@ models/*.csv
 data/
 !data/.gitkeep
 
+# Cache
+.cache/
+
 # Temporary files
 *.tmp
 *.temp

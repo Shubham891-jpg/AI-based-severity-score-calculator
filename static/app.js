@@ -701,7 +701,6 @@ async function fetchDiagnostics() {
             }
         }
     } catch (e) {
-        console.warn('Backend model info endpoint unavailable. Standard metadata loaded.');
         renderDiagnosticsInfo();
     }
 }

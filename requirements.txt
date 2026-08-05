@@ -5,6 +5,7 @@ fastapi>=0.100.0
 uvicorn>=0.23.0
 pydantic>=2.0.0
 sentence-transformers>=2.2.0
+huggingface-hub>=0.20.0,<1.0.0
 googletrans==4.0.0rc1
 langdetect>=1.0.9
 nltk>=3.8.1

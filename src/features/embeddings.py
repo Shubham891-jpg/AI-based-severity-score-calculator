@@ -1,8 +1,12 @@
+import os
+# Force Hugging Face cache to be in the workspace directory so it persists in the Render run container
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+os.environ["HF_HOME"] = os.path.join(project_root, ".cache", "huggingface")
+
 import numpy as np
 from sentence_transformers import SentenceTransformer
 from typing import List, Union
 import pickle
-import os
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
