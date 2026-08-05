@@ -7,7 +7,10 @@ import numpy as np
 from sentence_transformers import SentenceTransformer
 from typing import List, Union
 import pickle
-import psutil
+try:
+    import psutil
+except ImportError:
+    psutil = None
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -189,8 +192,10 @@ class MultilingualEmbeddings:
     def get_memory_usage(self) -> dict:
         """Get current memory usage if DEBUG mode is enabled."""
         if os.getenv("DEBUG", "False").lower() == "true":
-            process = psutil.Process(os.getpid())
-            return {"memory_mb": process.memory_info().rss / (1024 * 1024)}
+            if psutil is not None:
+                process = psutil.Process(os.getpid())
+                return {"memory_mb": process.memory_info().rss / (1024 * 1024)}
+            return {"error": "psutil module not available"}
         return {"error": "DEBUG mode not enabled"}
     
     def save_embeddings(self, embeddings: np.ndarray, filepath: str):
