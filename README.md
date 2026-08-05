@@ -1,3 +1,12 @@
+---
+title: IT Ticket Severity Calculator
+emoji: 🎫
+colorFrom: blue
+colorTo: indigo
+sdk: docker
+app_port: 7860
+---
+
 # IT Ticket Severity Calculator
 
 An AI-powered web application that automatically calculates severity scores for IT support tickets using machine learning. The system supports both English and Hindi languages and provides real-time severity assessment through a user-friendly web interface.
