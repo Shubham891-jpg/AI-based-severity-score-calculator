@@ -7,6 +7,7 @@ import numpy as np
 from sentence_transformers import SentenceTransformer
 from typing import List, Union
 import pickle
+import psutil
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -24,12 +25,20 @@ class MultilingualEmbeddings:
         self.model_name = model_name
         self.model = None
         self.embedding_dim = None
-        self._load_model()
         
     def _load_model(self):
         """Load the sentence transformer model."""
+        if self.model is not None:
+            return
+
         try:
             logger.info(f"Loading embedding model: {self.model_name}")
+            try:
+                import torch
+                torch.set_num_threads(1)
+                torch.set_num_interop_threads(1)
+            except Exception:
+                pass
             self.model = SentenceTransformer(self.model_name)
             
             # Get embedding dimension
@@ -56,6 +65,7 @@ class MultilingualEmbeddings:
         Returns:
             Numpy array of embeddings
         """
+        self._load_model()
         if isinstance(texts, str):
             texts = [texts]
             
@@ -89,6 +99,7 @@ class MultilingualEmbeddings:
         Returns:
             1D numpy array representing the embedding
         """
+        self._load_model()
         if not text or not text.strip():
             return np.zeros(self.embedding_dim)
             
@@ -111,6 +122,7 @@ class MultilingualEmbeddings:
         Returns:
             Cosine similarity score between -1 and 1
         """
+        self._load_model()
         try:
             embeddings = self.encode_texts([text1, text2], show_progress=False)
             
@@ -146,6 +158,7 @@ class MultilingualEmbeddings:
         Returns:
             List of tuples (text, similarity_score) sorted by similarity
         """
+        self._load_model()
         if not candidate_texts:
             return []
             
@@ -172,6 +185,13 @@ class MultilingualEmbeddings:
         except Exception as e:
             logger.error(f"Failed to find similar texts: {str(e)}")
             return []
+    
+    def get_memory_usage(self) -> dict:
+        """Get current memory usage if DEBUG mode is enabled."""
+        if os.getenv("DEBUG", "False").lower() == "true":
+            process = psutil.Process(os.getpid())
+            return {"memory_mb": process.memory_info().rss / (1024 * 1024)}
+        return {"error": "DEBUG mode not enabled"}
     
     def save_embeddings(self, embeddings: np.ndarray, filepath: str):
         """

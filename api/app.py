@@ -337,6 +337,13 @@ async def get_model_info():
         logger.error(f"Model info endpoint failed: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
+@app.get("/debug/memory", response_model=dict)
+async def debug_memory():
+    """Get process memory usage."""
+    if predictor is None:
+        raise HTTPException(status_code=503, detail="Model not initialized")
+    return predictor.get_memory_usage()
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request, exc):
     """Global exception handler."""

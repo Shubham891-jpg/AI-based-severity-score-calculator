@@ -31,6 +31,7 @@ class SeverityPredictor:
         self.embeddings = None
         self.text_cleaner = None
         self.language_detector = None
+        self.embeddings_model_name = None
         
         self._load_components()
     
@@ -52,17 +53,14 @@ class SeverityPredictor:
             self.scaler = SeverityScaler()
             self.scaler.load_scaler(scaler_path)
             
-            # Load embeddings info and initialize embeddings
+            # Load embeddings info
             embeddings_info_path = os.path.join(self.model_dir, "embeddings_info.pkl")
             if os.path.exists(embeddings_info_path):
                 embeddings_info = joblib.load(embeddings_info_path)
-                model_name = embeddings_info['model_name']
+                self.embeddings_model_name = embeddings_info['model_name']
             else:
-                # Default model if info file doesn't exist
-                model_name = "paraphrase-multilingual-MiniLM-L12-v2"
+                self.embeddings_model_name = "paraphrase-multilingual-MiniLM-L12-v2"
                 
-            self.embeddings = MultilingualEmbeddings(model_name=model_name)
-            
             # Initialize preprocessing components
             self.text_cleaner = TextCleaner(remove_stopwords=True, lowercase=True)
             self.language_detector = LanguageDetector()
@@ -72,6 +70,12 @@ class SeverityPredictor:
         except Exception as e:
             logger.error(f"Failed to load model components: {str(e)}")
             raise
+    
+    def _ensure_embeddings_loaded(self):
+        """Lazy load embeddings model."""
+        if self.embeddings is None:
+            logger.info("Initializing embeddings model...")
+            self.embeddings = MultilingualEmbeddings(model_name=self.embeddings_model_name)
     
     def preprocess_text(self, text: str) -> str:
         """
@@ -107,6 +111,9 @@ class SeverityPredictor:
             Feature vector
         """
         try:
+            # Ensure embeddings are loaded
+            self._ensure_embeddings_loaded()
+            
             # Get embeddings
             features = self.embeddings.encode_single_text(text)
             
@@ -245,6 +252,18 @@ class SeverityPredictor:
             logger.warning(f"Confidence calculation failed: {str(e)}")
             return 0.5  # Default confidence
     
+    def get_memory_usage(self) -> dict:
+        """Get process memory usage for debugging."""
+        try:
+            import psutil
+            process = psutil.Process(os.getpid())
+            return {
+                'rss_mb': process.memory_info().rss / (1024 * 1024),
+                'vms_mb': process.memory_info().vms / (1024 * 1024)
+            }
+        except Exception:
+            return {'error': 'psutil not installed or inaccessible'}
+    
     def get_model_info(self) -> dict:
         """
         Get information about the loaded model.
@@ -256,8 +275,8 @@ class SeverityPredictor:
             info = {
                 'model_type': type(self.model).__name__,
                 'scaler_info': self.scaler.get_scaler_info(),
-                'embedding_model': self.embeddings.model_name,
-                'embedding_dim': self.embeddings.embedding_dim,
+                'embedding_model': self.embeddings_model_name,
+                'embedding_dim': self.embeddings.embedding_dim if self.embeddings else "not initialized",
                 'model_dir': self.model_dir
             }
             
