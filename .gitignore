@@ -43,10 +43,10 @@ logs/
 .DS_Store
 Thumbs.db
 
-# Model artifacts — tracked via Git LFS or excluded; keep .gitkeep
-models/*.pkl
-models/*.joblib
-models/*.csv
+# Model artifacts — included in repo
+# models/*.pkl
+# models/*.joblib
+# models/*.csv
 !models/.gitkeep
 
 # Data
