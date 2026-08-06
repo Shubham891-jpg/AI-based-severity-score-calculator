@@ -2,7 +2,15 @@ import numpy as np
 import joblib
 import os
 import sys
+import warnings
 from typing import List
+
+# Suppress scikit-learn model unpickling version warnings
+try:
+    from sklearn.exceptions import InconsistentVersionWarning
+    warnings.filterwarnings("ignore", category=InconsistentVersionWarning)
+except ImportError:
+    warnings.filterwarnings("ignore", category=UserWarning)
 
 # Add src to path for imports
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
