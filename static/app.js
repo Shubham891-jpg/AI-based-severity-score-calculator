@@ -356,8 +356,24 @@ async function predictSeverity() {
         });
         
         if (!response.ok) {
-            const errData = await response.json();
-            throw new Error(errData.detail || 'Analysis pipeline returned an error');
+            let errorMsg = `Server error (${response.status})`;
+            try {
+                const errData = await response.json();
+                errorMsg = errData.detail || errData.error || errorMsg;
+            } catch (e) {
+                try {
+                    const rawText = await response.text();
+                    if (rawText && rawText.trim()) {
+                        const cleanText = rawText.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+                        if (cleanText) {
+                            errorMsg = cleanText.substring(0, 150);
+                        }
+                    }
+                } catch (tErr) {
+                    // Ignore text read error
+                }
+            }
+            throw new Error(errorMsg);
         }
         
         const result = await response.json();
@@ -382,7 +398,7 @@ async function predictSeverity() {
         saveHistory();
         
     } catch (error) {
-        showToast(error.message, 'error');
+        showToast(error.message || 'An error occurred while connecting to the server', 'error');
         placeholder.style.display = 'flex';
     } finally {
         button.disabled = false;
@@ -514,8 +530,24 @@ async function processBatch() {
         progressBarFill.style.width = '75%';
         
         if (!response.ok) {
-            const errData = await response.json();
-            throw new Error(errData.detail || 'Batch calculator failed');
+            let errorMsg = `Batch calculator failed (${response.status})`;
+            try {
+                const errData = await response.json();
+                errorMsg = errData.detail || errData.error || errorMsg;
+            } catch (e) {
+                try {
+                    const rawText = await response.text();
+                    if (rawText && rawText.trim()) {
+                        const cleanText = rawText.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+                        if (cleanText) {
+                            errorMsg = cleanText.substring(0, 150);
+                        }
+                    }
+                } catch (tErr) {
+                    // Ignore text read error
+                }
+            }
+            throw new Error(errorMsg);
         }
         
         const data = await response.json();

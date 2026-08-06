@@ -1,8 +1,8 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
-from pydantic import BaseModel, Field, validator
+from fastapi.responses import FileResponse, JSONResponse
+from pydantic import BaseModel, Field, field_validator
 from typing import List
 import os
 import sys
@@ -74,8 +74,9 @@ class TicketRequest(BaseModel):
         example="Server is down and users cannot access email"
     )
     
-    @validator('ticket_text')
-    def validate_ticket_text(cls, v):
+    @field_validator('ticket_text')
+    @classmethod
+    def validate_ticket_text(cls, v: str) -> str:
         if not v.strip():
             raise ValueError('Ticket text cannot be empty or only whitespace')
         return v.strip()
@@ -159,6 +160,8 @@ async def startup_event():
             raise FileNotFoundError("Model directory not found. Please train the model first.")
         
         predictor = SeverityPredictor(model_dir=model_dir)
+        # Pre-load embeddings model to warm up during startup
+        predictor._ensure_embeddings_loaded()
         logger.info("Severity predictor initialized successfully")
         
     except Exception as e:
@@ -348,10 +351,13 @@ async def debug_memory():
 async def global_exception_handler(request, exc):
     """Global exception handler."""
     logger.error(f"Unhandled exception: {str(exc)}")
-    return ErrorResponse(
-        error="Internal Server Error",
-        detail=str(exc),
-        timestamp=datetime.now().isoformat()
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": "Internal Server Error",
+            "detail": str(exc),
+            "timestamp": datetime.now().isoformat()
+        }
     )
 
 # Add CORS middleware for web applications

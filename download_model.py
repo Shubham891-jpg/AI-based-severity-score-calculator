@@ -14,6 +14,7 @@ def pre_download_assets():
     
     print(f"⏳ Pre-downloading NLTK data to {nltk_data_path}...")
     nltk.download('punkt', download_dir=nltk_data_path, quiet=True)
+    nltk.download('punkt_tab', download_dir=nltk_data_path, quiet=True)
     nltk.download('stopwords', download_dir=nltk_data_path, quiet=True)
     print("✅ NLTK data pre-downloaded successfully.")
     

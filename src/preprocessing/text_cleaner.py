@@ -38,15 +38,15 @@ class TextCleaner:
         
     def _download_nltk_data(self):
         """Download required NLTK data."""
-        try:
-            nltk.data.find('tokenizers/punkt')
-        except LookupError:
-            nltk.download('punkt', quiet=True)
-            
-        try:
-            nltk.data.find('corpora/stopwords')
-        except LookupError:
-            nltk.download('stopwords', quiet=True)
+        for resource in ['tokenizers/punkt', 'tokenizers/punkt_tab', 'corpora/stopwords']:
+            try:
+                nltk.data.find(resource)
+            except LookupError:
+                try:
+                    name = resource.split('/')[-1]
+                    nltk.download(name, quiet=True)
+                except Exception:
+                    pass
     
     def clean_text(self, text: str, language: str = 'en') -> str:
         """
