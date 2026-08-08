@@ -28,8 +28,8 @@ def main():
     print("="*60 + "\n")
     
     try:
-        # Get port from environment variable (or default to universal standard 8080)
-        port = int(os.environ.get("PORT", 8080))
+        # Get port from environment variable (or default to Hugging Face Spaces port 7860)
+        port = int(os.environ.get("PORT", 7860))
         
         # Start the server
         uvicorn.run(
