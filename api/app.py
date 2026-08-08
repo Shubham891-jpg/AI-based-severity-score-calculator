@@ -1,12 +1,15 @@
+import os
+import sys
+import threading
+import asyncio
+from datetime import datetime
+from typing import List, Dict, Any
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field, field_validator
-from typing import List, Dict, Any
-import os
-import sys
-from datetime import datetime
 
 # Add src to path for imports
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
@@ -156,7 +159,6 @@ def get_predictor() -> SeverityPredictor:
 async def startup_event():
     """Startup hook: warms up the thread-safe singleton predictor in background."""
     logger.info("Server startup: immediate socket binding enabled.")
-    import asyncio
     asyncio.create_task(asyncio.to_thread(get_predictor))
 
 @app.api_route("/", methods=["GET", "HEAD"])
@@ -223,7 +225,7 @@ async def predict_severity(request: TicketRequest):
         # Validate prediction
         if not p.validate_prediction(result):
             logger.error(f"Invalid prediction result: {result}")
-            raise HTTPException(status_code=500, detail="Invalid prediction result")
+            raise HTTPException(status_code=500, detail=f"Invalid prediction result: {result}")
         
         return SeverityResponse(
             severity_score=result['severity_score'],
