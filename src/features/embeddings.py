@@ -38,15 +38,34 @@ class MultilingualEmbeddings:
             logger.info(f"Loading embedding model: {self.model_name}")
             try:
                 import torch
+                import gc
                 torch.set_num_threads(1)
                 torch.set_num_interop_threads(1)
                 torch.set_grad_enabled(False)
             except Exception:
                 pass
             self.model = SentenceTransformer(self.model_name)
+            self.model.eval()
+            
+            # Apply PyTorch dynamic quantization to reduce memory from ~470MB down to ~140MB
+            try:
+                import torch
+                import gc
+                if hasattr(self.model, '_first_module') and hasattr(self.model._first_module(), 'auto_model'):
+                    self.model._first_module().auto_model = torch.quantization.quantize_dynamic(
+                        self.model._first_module().auto_model, {torch.nn.Linear}, dtype=torch.qint8
+                    )
+                elif len(self.model) > 0 and hasattr(self.model[0], 'auto_model'):
+                    self.model[0].auto_model = torch.quantization.quantize_dynamic(
+                        self.model[0].auto_model, {torch.nn.Linear}, dtype=torch.qint8
+                    )
+                logger.info("Dynamic int8 quantization applied to SentenceTransformer successfully")
+                gc.collect()
+            except Exception as q_err:
+                logger.warning(f"Dynamic quantization not applied: {q_err}")
             
             # Get embedding dimension
-            sample_embedding = self.model.encode(["test"])
+            sample_embedding = self.model.encode(["test"], show_progress_bar=False)
             self.embedding_dim = sample_embedding.shape[1]
             
             logger.info(f"Model loaded successfully. Embedding dimension: {self.embedding_dim}")
