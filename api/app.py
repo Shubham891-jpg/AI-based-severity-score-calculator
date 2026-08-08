@@ -146,7 +146,7 @@ class ErrorResponse(BaseModel):
 
 @app.on_event("startup")
 async def startup_event():
-    """Initialize the model predictor on startup."""
+    """Initialize the model predictor on startup without blocking port binding."""
     global predictor
     try:
         logger.info("Initializing severity predictor...")
@@ -160,9 +160,11 @@ async def startup_event():
             raise FileNotFoundError("Model directory not found. Please train the model first.")
         
         predictor = SeverityPredictor(model_dir=model_dir)
-        # Pre-load embeddings model to warm up during startup
-        predictor._ensure_embeddings_loaded()
-        logger.info("Severity predictor initialized successfully")
+        
+        # Warm up embeddings in background task so TCP port binds in < 0.1s
+        import asyncio
+        asyncio.create_task(asyncio.to_thread(predictor._ensure_embeddings_loaded))
+        logger.info("Severity predictor initialized; background warmup scheduled")
         
     except Exception as e:
         logger.error(f"Failed to initialize predictor: {str(e)}")
@@ -219,6 +221,9 @@ async def predict_severity(request: TicketRequest):
         if predictor is None:
             raise HTTPException(status_code=503, detail="Model not initialized")
         
+        # Ensure warmup is finished
+        predictor._ensure_embeddings_loaded()
+        
         # Validate input
         if not request.ticket_text.strip():
             raise HTTPException(status_code=400, detail="Ticket text cannot be empty")
@@ -262,6 +267,9 @@ async def predict_batch_severity(request: BatchTicketRequest):
     try:
         if predictor is None:
             raise HTTPException(status_code=503, detail="Model not initialized")
+        
+        # Ensure warmup is finished
+        predictor._ensure_embeddings_loaded()
         
         # Validate input
         if not request.tickets:
