@@ -127,29 +127,34 @@ class ErrorResponse(BaseModel):
     detail: str
     timestamp: str
 
-# Global predictor instance
+# Global predictor instance with thread-safe lock
 predictor = None
+_init_lock = threading.Lock()
 
 def get_predictor() -> SeverityPredictor:
-    """Get or lazily initialize the predictor."""
+    """Thread-safe singleton predictor."""
     global predictor
     if predictor is not None:
         return predictor
     
-    logger.info("Initializing severity predictor...")
-    model_dir = "models" if os.path.exists("models") else "../models"
-    if not os.path.exists(model_dir):
-        raise FileNotFoundError(f"Model directory not found: {model_dir}")
-    
-    p = SeverityPredictor(model_dir=model_dir)
-    p._ensure_embeddings_loaded()
-    predictor = p
-    logger.info("Severity predictor initialized successfully and ready for inference.")
-    return predictor
+    with _init_lock:
+        if predictor is not None:
+            return predictor
+        
+        logger.info("Initializing severity predictor (thread-safe singleton)...")
+        model_dir = "models" if os.path.exists("models") else "../models"
+        if not os.path.exists(model_dir):
+            raise FileNotFoundError(f"Model directory not found: {model_dir}")
+        
+        p = SeverityPredictor(model_dir=model_dir)
+        p._ensure_embeddings_loaded()
+        predictor = p
+        logger.info("Severity predictor initialized successfully and ready for inference.")
+        return predictor
 
 @app.on_event("startup")
 async def startup_event():
-    """Startup hook: triggers background model warmup without blocking socket port binding."""
+    """Startup hook: warms up the thread-safe singleton predictor in background."""
     logger.info("Server startup: immediate socket binding enabled.")
     import asyncio
     asyncio.create_task(asyncio.to_thread(get_predictor))
