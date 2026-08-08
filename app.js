@@ -10,7 +10,7 @@ function getApiBaseUrl() {
     const protocol = window.location.protocol;
     
     // Auto-detect Hugging Face Spaces or static hosting
-    if (host.includes('hf.space') || host.includes('huggingface.co') || protocol === 'file:' || host === 'localhost' && window.location.port !== '8000' && window.location.port !== '10000') {
+    if (host.includes('hf.space') || host.includes('huggingface.co') || protocol === 'file:' || (host === 'localhost' && window.location.port !== '8000' && window.location.port !== '10000')) {
         return DEFAULT_BACKEND_URL;
     }
     return window.location.origin;
@@ -307,7 +307,7 @@ async function checkApiHealth() {
         state.apiStatus = 'offline';
         if (statusDot) statusDot.className = 'status-dot inactive';
         if (statusText) statusText.textContent = 'Disconnected';
-        showToast('Server connection offline. Check python console uvicorn state.', 'error');
+        showToast('Server connection offline. Check backend status.', 'error');
     }
 }
 
