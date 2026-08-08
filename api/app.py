@@ -154,7 +154,7 @@ async def startup_event():
     import asyncio
     asyncio.create_task(asyncio.to_thread(get_predictor))
 
-@app.get("/")
+@app.api_route("/", methods=["GET", "HEAD"])
 async def root():
     """Serve the main web interface."""
     return FileResponse('static/index.html')
@@ -174,7 +174,7 @@ async def api_root():
         }
     }
 
-@app.get("/health", response_model=HealthResponse)
+@app.api_route("/health", methods=["GET", "HEAD"], response_model=HealthResponse)
 async def health_check():
     """Health check endpoint: returns 200 OK immediately for Render probes."""
     try:
