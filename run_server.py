@@ -28,13 +28,13 @@ def main():
     print("="*60 + "\n")
     
     try:
-        # Get port from environment variable (Render uses 10000) or default to 10000
-        port = int(os.environ.get("PORT", 10000))
+        # Get port from environment variable (or default to universal standard 8080)
+        port = int(os.environ.get("PORT", 8080))
         
         # Start the server
         uvicorn.run(
             "api.app:app",
-            host="0.0.0.0",  # Bind to all interfaces for browser access
+            host="0.0.0.0",  # Bind to all interfaces
             port=port,
             reload=False,  # Set to True for development
             log_level="info",

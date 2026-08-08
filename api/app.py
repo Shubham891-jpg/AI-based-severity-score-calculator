@@ -3,10 +3,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field, field_validator
-from typing import List
+from typing import List, Dict, Any
 import os
 import sys
-import uvicorn
 from datetime import datetime
 
 # Add src to path for imports
@@ -39,27 +38,94 @@ app = FastAPI(
     - **Medium (40-59)**: Moderate impact on users
     - **Low (20-39)**: Minor issues, individual users
     - **Minimal (10-19)**: Requests, questions
-    
-    ## Quick Start
-    - Use `/predict` for single ticket predictions
-    - Use `/predict/batch` for multiple tickets
-    - Check `/health` for system status
     """,
     version="2.0.0",
     docs_url="/docs",
-    redoc_url="/redoc",
-    contact={
-        "name": "IT Ticket Severity Calculator",
-        "url": "http://localhost:8000",
-    },
-    license_info={
-        "name": "MIT License",
-        "url": "https://opensource.org/licenses/MIT",
-    }
+    redoc_url="/redoc"
 )
 
 # Mount static files
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# Pydantic models for request/response
+class TicketRequest(BaseModel):
+    ticket_text: str = Field(
+        ..., 
+        description="IT ticket text in English or Hindi",
+        min_length=1,
+        max_length=5000,
+        example="Server is down and users cannot access email"
+    )
+    
+    @field_validator('ticket_text')
+    @classmethod
+    def validate_ticket_text(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError('Ticket text cannot be empty or only whitespace')
+        return v.strip()
+
+class SeverityResponse(BaseModel):
+    severity_score: float = Field(
+        ..., 
+        description="Severity score between 10-100",
+        ge=10,
+        le=100,
+        example=75.5
+    )
+    severity_category: str = Field(
+        ..., 
+        description="Severity category (High, Medium, Low)",
+        example="High"
+    )
+    confidence: float = Field(
+        ..., 
+        description="Prediction confidence score between 0-1",
+        ge=0,
+        le=1,
+        example=0.85
+    )
+    detected_language: str = Field(
+        ..., 
+        description="Detected language of input text",
+        example="en"
+    )
+    processed_text: str = Field(
+        ..., 
+        description="Preprocessed version of input text",
+        example="server down users access email"
+    )
+    timestamp: str = Field(
+        ..., 
+        description="Prediction timestamp in ISO format",
+        example="2024-01-15T10:30:00.123456"
+    )
+
+class BatchTicketRequest(BaseModel):
+    tickets: List[str] = Field(
+        ...,
+        description="List of IT ticket texts",
+        max_items=100,
+        example=[
+            "Server is down and users cannot access email",
+            "Printer not working in office",
+            "सर्वर डाउन है"
+        ]
+    )
+
+class BatchSeverityResponse(BaseModel):
+    predictions: List[SeverityResponse]
+    total_tickets: int
+    processing_time_seconds: float
+
+class HealthResponse(BaseModel):
+    status: str
+    timestamp: str
+    model_info: Dict[str, Any]
+
+class ErrorResponse(BaseModel):
+    error: str
+    detail: str
+    timestamp: str
 
 # Global predictor instance
 predictor = None
@@ -70,10 +136,10 @@ def get_predictor() -> SeverityPredictor:
     if predictor is not None:
         return predictor
     
-    logger.info("Initializing severity predictor in worker thread...")
+    logger.info("Initializing severity predictor...")
     model_dir = "models" if os.path.exists("models") else "../models"
     if not os.path.exists(model_dir):
-        raise FileNotFoundError("Model directory not found. Please train the model first.")
+        raise FileNotFoundError(f"Model directory not found: {model_dir}")
     
     p = SeverityPredictor(model_dir=model_dir)
     p._ensure_embeddings_loaded()
@@ -150,7 +216,7 @@ async def predict_severity(request: TicketRequest):
             raise HTTPException(status_code=500, detail=f"Prediction failed: {result['error']}")
         
         # Validate prediction
-        if not predictor.validate_prediction(result):
+        if not p.validate_prediction(result):
             logger.error(f"Invalid prediction result: {result}")
             raise HTTPException(status_code=500, detail="Invalid prediction result")
         
@@ -278,7 +344,7 @@ async def global_exception_handler(request, exc):
 # Add CORS middleware for web applications
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure appropriately for production
+    allow_origins=["*"],
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
