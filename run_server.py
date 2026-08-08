@@ -28,8 +28,8 @@ def main():
     print("="*60 + "\n")
     
     try:
-        # Get port from environment variable (for deployment platforms) or use 8000
-        port = int(os.environ.get("PORT", 8000))
+        # Get port from environment variable (Render uses 10000) or default to 10000
+        port = int(os.environ.get("PORT", 10000))
         
         # Start the server
         uvicorn.run(
