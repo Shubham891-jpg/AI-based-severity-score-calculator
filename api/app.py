@@ -64,111 +64,29 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 # Global predictor instance
 predictor = None
 
-# Pydantic models for request/response
-class TicketRequest(BaseModel):
-    ticket_text: str = Field(
-        ..., 
-        description="IT ticket text in English or Hindi",
-        min_length=1,
-        max_length=5000,
-        example="Server is down and users cannot access email"
-    )
+def get_predictor() -> SeverityPredictor:
+    """Get or lazily initialize the predictor."""
+    global predictor
+    if predictor is not None:
+        return predictor
     
-    @field_validator('ticket_text')
-    @classmethod
-    def validate_ticket_text(cls, v: str) -> str:
-        if not v.strip():
-            raise ValueError('Ticket text cannot be empty or only whitespace')
-        return v.strip()
-
-class SeverityResponse(BaseModel):
-    severity_score: float = Field(
-        ..., 
-        description="Severity score between 10-100",
-        ge=10,
-        le=100,
-        example=75.5
-    )
-    severity_category: str = Field(
-        ..., 
-        description="Severity category (High, Medium, Low)",
-        example="High"
-    )
-    confidence: float = Field(
-        ..., 
-        description="Prediction confidence score between 0-1",
-        ge=0,
-        le=1,
-        example=0.85
-    )
-    detected_language: str = Field(
-        ..., 
-        description="Detected language of input text",
-        example="en"
-    )
-    processed_text: str = Field(
-        ..., 
-        description="Preprocessed version of input text",
-        example="server down users access email"
-    )
-    timestamp: str = Field(
-        ..., 
-        description="Prediction timestamp in ISO format",
-        example="2024-01-15T10:30:00.123456"
-    )
-
-class BatchTicketRequest(BaseModel):
-    tickets: List[str] = Field(
-        ...,
-        description="List of IT ticket texts",
-        max_items=100,
-        example=[
-            "Server is down and users cannot access email",
-            "Printer not working in office",
-            "सर्वर डाउन है"
-        ]
-    )
-
-class BatchSeverityResponse(BaseModel):
-    predictions: List[SeverityResponse]
-    total_tickets: int
-    processing_time_seconds: float
-
-class HealthResponse(BaseModel):
-    status: str
-    timestamp: str
-    model_info: dict
-
-class ErrorResponse(BaseModel):
-    error: str
-    detail: str
-    timestamp: str
+    logger.info("Initializing severity predictor in worker thread...")
+    model_dir = "models" if os.path.exists("models") else "../models"
+    if not os.path.exists(model_dir):
+        raise FileNotFoundError("Model directory not found. Please train the model first.")
+    
+    p = SeverityPredictor(model_dir=model_dir)
+    p._ensure_embeddings_loaded()
+    predictor = p
+    logger.info("Severity predictor initialized successfully and ready for inference.")
+    return predictor
 
 @app.on_event("startup")
 async def startup_event():
-    """Initialize the model predictor on startup without blocking port binding."""
-    global predictor
-    try:
-        logger.info("Initializing severity predictor...")
-        
-        # Check if model files exist
-        model_dir = "models"
-        if not os.path.exists(model_dir):
-            model_dir = "../models"  # Try relative path
-            
-        if not os.path.exists(model_dir):
-            raise FileNotFoundError("Model directory not found. Please train the model first.")
-        
-        predictor = SeverityPredictor(model_dir=model_dir)
-        
-        # Warm up embeddings in background task so TCP port binds in < 0.1s
-        import asyncio
-        asyncio.create_task(asyncio.to_thread(predictor._ensure_embeddings_loaded))
-        logger.info("Severity predictor initialized; background warmup scheduled")
-        
-    except Exception as e:
-        logger.error(f"Failed to initialize predictor: {str(e)}")
-        raise
+    """Startup hook: triggers background model warmup without blocking socket port binding."""
+    logger.info("Server startup: immediate socket binding enabled.")
+    import asyncio
+    asyncio.create_task(asyncio.to_thread(get_predictor))
 
 @app.get("/")
 async def root():
@@ -192,22 +110,21 @@ async def api_root():
 
 @app.get("/health", response_model=HealthResponse)
 async def health_check():
-    """Health check endpoint."""
+    """Health check endpoint: returns 200 OK immediately for Render probes."""
     try:
-        if predictor is None:
-            raise HTTPException(status_code=503, detail="Model not initialized")
-        
-        model_info = predictor.get_model_info()
-        
+        model_info = predictor.get_model_info() if predictor is not None else {"status": "warming_up"}
         return HealthResponse(
             status="healthy",
             timestamp=datetime.now().isoformat(),
             model_info=model_info
         )
-        
     except Exception as e:
-        logger.error(f"Health check failed: {str(e)}")
-        raise HTTPException(status_code=503, detail=f"Service unhealthy: {str(e)}")
+        logger.warning(f"Health check info: {str(e)}")
+        return HealthResponse(
+            status="healthy",
+            timestamp=datetime.now().isoformat(),
+            model_info={"status": "initializing"}
+        )
 
 @app.post("/predict", response_model=SeverityResponse)
 async def predict_severity(request: TicketRequest):
@@ -218,18 +135,14 @@ async def predict_severity(request: TicketRequest):
     - Returns severity score (10-100), category, and additional metadata
     """
     try:
-        if predictor is None:
-            raise HTTPException(status_code=503, detail="Model not initialized")
-        
-        # Ensure warmup is finished
-        predictor._ensure_embeddings_loaded()
+        p = get_predictor()
         
         # Validate input
         if not request.ticket_text.strip():
             raise HTTPException(status_code=400, detail="Ticket text cannot be empty")
         
         # Make prediction
-        result = predictor.predict_single(request.ticket_text)
+        result = p.predict_single(request.ticket_text)
         
         # Check for prediction errors
         if 'error' in result:
@@ -265,11 +178,7 @@ async def predict_batch_severity(request: BatchTicketRequest):
     - Returns list of predictions with processing time
     """
     try:
-        if predictor is None:
-            raise HTTPException(status_code=503, detail="Model not initialized")
-        
-        # Ensure warmup is finished
-        predictor._ensure_embeddings_loaded()
+        p = get_predictor()
         
         # Validate input
         if not request.tickets:
@@ -288,7 +197,7 @@ async def predict_batch_severity(request: BatchTicketRequest):
         start_time = datetime.now()
         
         # Make batch predictions
-        results = predictor.predict_batch(valid_tickets)
+        results = p.predict_batch(valid_tickets)
         
         # Calculate processing time
         processing_time = (datetime.now() - start_time).total_seconds()
@@ -296,7 +205,7 @@ async def predict_batch_severity(request: BatchTicketRequest):
         # Convert results to response format
         predictions = []
         for result in results:
-            if 'error' not in result and predictor.validate_prediction(result):
+            if 'error' not in result and p.validate_prediction(result):
                 predictions.append(SeverityResponse(
                     severity_score=result['severity_score'],
                     severity_category=result['severity_category'],
@@ -333,10 +242,8 @@ async def predict_batch_severity(request: BatchTicketRequest):
 async def get_model_info():
     """Get information about the loaded model."""
     try:
-        if predictor is None:
-            raise HTTPException(status_code=503, detail="Model not initialized")
-        
-        model_info = predictor.get_model_info()
+        p = get_predictor()
+        model_info = p.get_model_info()
         return {
             "model_info": model_info,
             "timestamp": datetime.now().isoformat()

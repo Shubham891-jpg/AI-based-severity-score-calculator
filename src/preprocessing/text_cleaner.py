@@ -1,3 +1,4 @@
+import os
 import re
 from typing import List
 import nltk
@@ -7,19 +8,42 @@ from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
+# Register local cached NLTK paths
+_project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+for _p in [
+    os.path.join(_project_root, ".cache", "nltk_data"),
+    os.path.join(os.getcwd(), ".cache", "nltk_data"),
+    "/app/.cache/nltk_data",
+    os.path.expanduser("~/.cache/nltk_data")
+]:
+    if os.path.exists(_p) and _p not in nltk.data.path:
+        nltk.data.path.insert(0, _p)
+
 class TextCleaner:
     """Comprehensive text cleaning for IT ticket preprocessing."""
     
     def __init__(self, remove_stopwords: bool = True, lowercase: bool = True):
         self.remove_stopwords = remove_stopwords
         self.lowercase = lowercase
-        self._download_nltk_data()
+        self._ensure_nltk_data()
         
         # Load stopwords for both languages
         try:
             self.english_stopwords = set(stopwords.words('english'))
-        except:
-            self.english_stopwords = set()
+        except Exception:
+            self.english_stopwords = {
+                'i', 'me', 'my', 'myself', 'we', 'our', 'ours', 'ourselves', 'you', "you're",
+                "you've", "you'll", "you'd", 'your', 'yours', 'yourself', 'yourselves', 'he',
+                'him', 'his', 'himself', 'she', "she's", 'her', 'hers', 'herself', 'it', "it's",
+                'its', 'itself', 'they', 'them', 'their', 'theirs', 'themselves', 'what', 'which',
+                'who', 'whom', 'this', 'that', "that'll", 'these', 'those', 'am', 'is', 'are',
+                'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'having', 'do',
+                'does', 'did', 'doing', 'a', 'an', 'the', 'and', 'but', 'if', 'or', 'because',
+                'as', 'until', 'while', 'of', 'at', 'by', 'for', 'with', 'about', 'against',
+                'between', 'into', 'through', 'during', 'before', 'after', 'above', 'below',
+                'to', 'from', 'up', 'down', 'in', 'out', 'on', 'off', 'over', 'under', 'again',
+                'further', 'then', 'once', 'here', 'there', 'when', 'where', 'why', 'how', 'all'
+            }
             
         # Common Hindi stopwords (basic set)
         self.hindi_stopwords = {
@@ -36,17 +60,13 @@ class TextCleaner:
             'browser', 'application', 'software', 'hardware', 'printer', 'scanner', 'monitor'
         }
         
-    def _download_nltk_data(self):
-        """Download required NLTK data."""
+    def _ensure_nltk_data(self):
+        """Quickly check NLTK data without blocking network calls."""
         for resource in ['tokenizers/punkt', 'tokenizers/punkt_tab', 'corpora/stopwords']:
             try:
                 nltk.data.find(resource)
             except LookupError:
-                try:
-                    name = resource.split('/')[-1]
-                    nltk.download(name, quiet=True)
-                except Exception:
-                    pass
+                pass
     
     def clean_text(self, text: str, language: str = 'en') -> str:
         """
