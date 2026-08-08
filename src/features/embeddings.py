@@ -40,6 +40,7 @@ class MultilingualEmbeddings:
                 import torch
                 torch.set_num_threads(1)
                 torch.set_num_interop_threads(1)
+                torch.set_grad_enabled(False)
             except Exception:
                 pass
             self.model = SentenceTransformer(self.model_name)
@@ -78,12 +79,22 @@ class MultilingualEmbeddings:
         try:
             logger.info(f"Encoding {len(texts)} texts into embeddings")
             
-            embeddings = self.model.encode(
-                texts,
-                batch_size=batch_size,
-                show_progress_bar=show_progress,
-                convert_to_numpy=True
-            )
+            try:
+                import torch
+                with torch.no_grad():
+                    embeddings = self.model.encode(
+                        texts,
+                        batch_size=batch_size,
+                        show_progress_bar=show_progress,
+                        convert_to_numpy=True
+                    )
+            except Exception:
+                embeddings = self.model.encode(
+                    texts,
+                    batch_size=batch_size,
+                    show_progress_bar=show_progress,
+                    convert_to_numpy=True
+                )
             
             logger.info(f"Successfully encoded texts. Shape: {embeddings.shape}")
             return embeddings
@@ -107,7 +118,12 @@ class MultilingualEmbeddings:
             return np.zeros(self.embedding_dim)
             
         try:
-            embedding = self.model.encode([text], convert_to_numpy=True)
+            try:
+                import torch
+                with torch.no_grad():
+                    embedding = self.model.encode([text], convert_to_numpy=True)
+            except Exception:
+                embedding = self.model.encode([text], convert_to_numpy=True)
             return embedding[0]  # Return 1D array
             
         except Exception as e:

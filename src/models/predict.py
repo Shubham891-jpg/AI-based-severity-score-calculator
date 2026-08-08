@@ -80,10 +80,11 @@ class SeverityPredictor:
             raise
     
     def _ensure_embeddings_loaded(self):
-        """Lazy load embeddings model."""
+        """Lazy load embeddings model and warm up weights."""
         if self.embeddings is None:
             logger.info("Initializing embeddings model...")
             self.embeddings = MultilingualEmbeddings(model_name=self.embeddings_model_name)
+            self.embeddings._load_model()
     
     def preprocess_text(self, text: str) -> str:
         """
